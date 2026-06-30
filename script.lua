@@ -9,10 +9,10 @@ local RunService = game:GetService("RunService")
 local LocalSound = Instance.new("Sound")
 LocalSound.Name = "ThanhPhucLocalSound"
 LocalSound.Parent = LocalPlayer:WaitForChild("PlayerWorkspace", 5) or workspace
-LocalSound.Volume = 1.5 -- Âm lượng to, rõ, vừa vặn dải tần chống vỡ tiếng
+LocalSound.Volume = 1.5
 LocalSound.Looped = true
 
--- Thêm bộ nén Compressor để bo tròn dải bass, triệt tiêu tiếng rè hoàn toàn
+-- Bộ nén Compressor để bo tròn dải bass, triệt tiêu tiếng rè hoàn toàn
 local SoundCompressor = Instance.new("CompressorSoundEffect")
 SoundCompressor.Threshold = -8
 SoundCompressor.Attack = 0.01
@@ -29,16 +29,15 @@ local function CreateFakeBoombox()
     local character = LocalPlayer.Character
     if not character then return end
     
-    -- Gắn vào HumanoidRootPart để chắc chắn không bao giờ lỗi vị trí
     local rootPart = character:WaitForChild("HumanoidRootPart", 5)
     if not rootPart then return end
     
-    -- TẠO THÙNG LOA HÌNH HỘP CHỮ NHẬT ĐEO SAU LƯNG (Không dùng ID Mesh ngoài để tránh lỗi)
+    -- TẠO THÙNG LOA HÌNH HỘP CHỮ NHẬT ĐEO SAU LƯNG
     local part = Instance.new("Part")
     part.Name = "ThanhPhucBoombox"
-    part.Shape = Enum.PartType.Block       -- Ép buộc 100% ra hình thùng loa chữ nhật
-    part.Size = Vector3.new(2.2, 1.2, 0.6) -- Kích thước thùng loa chuẩn cân đối sau lưng
-    part.Material = Enum.Material.Neon    -- Chất liệu phát sáng rực rỡ
+    part.Shape = Enum.PartType.Block       
+    part.Size = Vector3.new(2.2, 1.2, 0.6) 
+    part.Material = Enum.Material.Neon    
     part.CanCollide = false
     part.Massless = true
     
@@ -49,7 +48,7 @@ local function CreateFakeBoombox()
     local weld = Instance.new("Weld")
     weld.Part0 = rootPart
     weld.Part1 = part
-    weld.C0 = CFrame.new(0, 0.4, 0.75) * CFrame.Angles(0, math.rad(180), 0) -- Căn giữa thẳng lưng
+    weld.C0 = CFrame.new(0, 0.4, 0.75) * CFrame.Angles(0, math.rad(180), 0) 
     weld.Parent = part
     
     -- HIỆU ỨNG CẦU VỒNG CHỚP NHẸ THEO NHỊP BASS
@@ -59,7 +58,6 @@ local function CreateFakeBoombox()
             hue = (hue + 1) % 360
             local color = Color3.fromHSV(hue/360, 1, 1)
             
-            -- Thùng loa tự động chớp nháy độ sáng theo nhịp nhạc
             local loudness = LocalSound.PlaybackLoudness
             local intensity = math.clamp(loudness / 280, 0.6, 1.5)
             
@@ -150,7 +148,6 @@ PlayBtn.MouseButton1Click:Connect(function()
         LocalSound.SoundId = "rbxassetid://" .. cleanID
         LocalSound:Play()
         
-        -- Tạo loa chữ nhật ngay lập tức không trễ một giây
         CreateFakeBoombox()
         print("Thanh Phuc Music: Đã hiện thùng loa chữ nhật chuẩn 100% sau lưng!")
     else
