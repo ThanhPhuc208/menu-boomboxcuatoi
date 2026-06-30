@@ -1,81 +1,159 @@
 -- (Creator = Thanh Phuc)
--- 💟 Thanh Phuc - Thùng Loa Cầu Vồng Neon (Hiện 100% - Bass Ấm Không Rè) 💟
+-- 💟 Thanh Phuc - Chroma Boombox Cầu Vồng Đeo Chéo + Nháy Theo Nhạc (Visualizer) 💟
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
--- CẤU HÌNH CHẤT ÂM GỐC - BASS ĐẦM KHÔNG RÈ
+-- HEÄ THOÁNG LOA KÉP (MI 10S) & BỘ LỌC SIÊU BASS
 local LocalSound = Instance.new("Sound")
 LocalSound.Name = "ThanhPhucLocalSound"
 LocalSound.Parent = LocalPlayer:WaitForChild("PlayerWorkspace", 5) or workspace
-LocalSound.Volume = 1.5
+LocalSound.Volume = 2
 LocalSound.Looped = true
 
--- Bộ nén Compressor để bo tròn dải bass, triệt tiêu tiếng rè hoàn toàn
-local SoundCompressor = Instance.new("CompressorSoundEffect")
-SoundCompressor.Threshold = -8
-SoundCompressor.Attack = 0.01
-SoundCompressor.Release = 0.1
-SoundCompressor.Ratio = 3
-SoundCompressor.Parent = LocalSound
+-- Tạo hiệu ứng Equalizer tăng cường Bass (Mô phỏng loa Mi 10S Harman Kardon)
+local Equalizer = Instance.new("EqualizerSoundEffect")
+Equalizer.LowGain = 12 -- Tăng mạnh dải Bass trầm
+Equalizer.MidGain = 2  -- Giữ âm lời trong trẻo
+Equalizer.HighGain = 4 -- Giúp tiếng chập cheng, treble mượt mà hơn
+Equalizer.Parent = LocalSound
 
+-- TẠO CHROMA BOOMBOX ĐEO CHÉO ẢO + SÓNG NHẠC VISUALIZER
 local FakeBoombox = nil
+local VisualizerBars = {}
+local loopConnection = nil -- Quản lý loop hiệu ứng tránh bị chồng luồng khi reset
 
--- HÀM TẠO THÙNG LOA HÌNH HỘP CHỮ NHẬT HIỆN 100%
 local function CreateFakeBoombox()
-    if FakeBoombox then FakeBoombox:Destroy() end
+    -- Dọn dẹp cũ triệt để trước khi tạo mới để tránh xung đột khi chuyển bài
+    if loopConnection then 
+        loopConnection:Disconnect() 
+        loopConnection = nil
+    end
+    if FakeBoombox then 
+        FakeBoombox:Destroy() 
+        FakeBoombox = nil
+    end
+    for _, bar in pairs(VisualizerBars) do 
+        if bar.Part then bar.Part:Destroy() end 
+    end
+    VisualizerBars = {}
     
-    local character = LocalPlayer.Character
+    local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     if not character then return end
     
-    local rootPart = character:WaitForChild("HumanoidRootPart", 5)
-    if not rootPart then return end
+    -- Chờ đợi chắc chắn bộ phận thân (Torso) xuất hiện để tránh lỗi khi hồi sinh
+    local torso = character:WaitForChild("UpperTorso", 5) or character:WaitForChild("Torso", 5)
+    if not torso then return end
     
-    -- TẠO THÙNG LOA HÌNH HỘP CHỮ NHẬT ĐEO SAU LƯNG
+    -- Tạo khối Box chuẩn chất liệu Neon phát sáng cầu vồng
     local part = Instance.new("Part")
-    part.Name = "ThanhPhucBoombox"
-    part.Shape = Enum.PartType.Block       
-    part.Size = Vector3.new(2.2, 1.2, 0.6) 
-    part.Material = Enum.Material.Neon    
+    part.Name = "ThanhPhucChromaBoombox"
+    part.Material = Enum.Material.Neon
     part.CanCollide = false
     part.Massless = true
-    
-    FakeBoombox = part
     part.Parent = character
+    FakeBoombox = part
     
-    -- Gắn chặt thùng loa ra sau lưng ngay lập tức
+    -- Kích thước gốc chuẩn (gọn gàng như trong ảnh)
+    local baseSize = Vector3.new(1.8, 1.2, 0.4)
+    part.Size = baseSize
+    
+    -- Gắn và Xoay Xéo như đeo Balo Quai Chéo sau lưng
     local weld = Instance.new("Weld")
-    weld.Part0 = rootPart
+    weld.Part0 = torso
     weld.Part1 = part
-    weld.C0 = CFrame.new(0, 0.4, 0.75) * CFrame.Angles(0, math.rad(180), 0) 
+    weld.C0 = CFrame.new(0, -0.2, 0.65) * CFrame.Angles(0, math.rad(180), math.rad(25))
     weld.Parent = part
     
-    -- HIỆU ỨNG CẦU VỒNG CHỚP NHẸ THEO NHỊP BASS
-    coroutine.wrap(function()
-        local hue = 0
-        while part and part.Parent and FakeBoombox == part do
-            hue = (hue + 1) % 360
-            local color = Color3.fromHSV(hue/360, 1, 1)
-            
-            local loudness = LocalSound.PlaybackLoudness
-            local intensity = math.clamp(loudness / 280, 0.6, 1.5)
-            
-            part.Color = Color3.new(color.R * intensity, color.G * intensity, color.B * intensity)
-            RunService.RenderStepped:Wait()
+    -- TẠO CÁC THANH SÓNG NHẠC (VISUALIZER BARS) - NÂNG CẤP LÊN 6 THANH KHÍT NHAU
+    local barCount = 6 -- Đã chỉnh thành 6 thanh theo yêu cầu
+    local barWidth = baseSize.X / barCount 
+    
+    for i = 1, barCount do
+        local bar = Instance.new("Part")
+        bar.Name = "VisualizerBar" .. i
+        bar.Material = Enum.Material.Neon
+        local varSize = Vector3.new(barWidth, 0.1, 0.2)
+        bar.Size = varSize
+        bar.CanCollide = false
+        bar.Massless = true
+        bar.Parent = character
+        
+        local barWeld = Instance.new("Weld")
+        barWeld.Part0 = part
+        barWeld.Part1 = bar
+        
+        -- Căn chỉnh vị trí xuất phát từ cạnh trái sang cạnh phải của khối hộp
+        local xOffset = -(baseSize.X / 2) + (i - 0.5) * barWidth
+        barWeld.C0 = CFrame.new(xOffset, baseSize.Y / 2, 0) 
+        barWeld.Parent = bar
+        
+        -- Khởi tạo chiều cao hiện tại để tính toán Lerp (làm mượt)
+        table.insert(VisualizerBars, {Part = bar, Weld = barWeld, Index = i, CurrentHeight = 0.1})
+    end
+    
+    -- Hiệu ứng chạy màu cầu vồng + KHỐI CẦU VỒNG ĐẬP THEO ÂM THANH
+    local hue = 0
+    loopConnection = RunService.RenderStepped:Connect(function()
+        if not part or not part.Parent or not part:IsDescendantOf(workspace) then
+            if loopConnection then loopConnection:Disconnect() end
+            return
         end
-    end)()
+        
+        -- Lấy độ lớn âm thanh hiện tại
+        local loudness = LocalSound.PlaybackLoudness
+        local normLoudness = math.clamp(loudness / 340, 0, 1) -- Chuẩn hóa mượt mà theo Bass Loa Kép
+        
+        -- Tốc độ chuyển màu Cầu vồng chạy theo nhịp Bass
+        local speedMultiplier = 1 + (normLoudness * 4)
+        hue = (hue + (0.6 * speedMultiplier)) % 360 
+        local mainColor = Color3.fromHSV(hue / 360, 1, 1)
+        
+        -- Áp màu cầu vồng lên khối chính (Chớp nhẹ độ sáng dựa trên nhịp bass)
+        part.Color = mainColor
+        
+        -- ĐẬP THEO NHẠC: Khối cầu vồng co giãn mượt mà theo Bass của Loa Kép
+        local scaleFactor = 1 + (normLoudness * 0.28) -- Đập nảy mạnh mẽ hơn một chút cực bốc
+        part.Size = Vector3.new(baseSize.X * scaleFactor, baseSize.Y * scaleFactor, baseSize.Z * scaleFactor)
+        
+        -- Cập nhật 6 thanh sóng nhạc nhấp nhô Siêu Mượt (Sử dụng thuật toán Lerp nội suy)
+        for _, item in pairs(VisualizerBars) do
+            if item.Part and item.Part.Parent then
+                -- Thuật toán tạo sóng nhịp hình sin tự nhiên kết hợp cường độ Bass
+                local waveFactor = math.sin(tick() * 18 + item.Index) * 0.15
+                local targetHeight = math.clamp((normLoudness * 0.85) + waveFactor, 0.05, 1.1)
+                
+                -- [CẢI TIẾN LÀM MƯỢT]: Dùng Lerp giúp thanh nhịp không bị giật khựng, mượt như lụa
+                item.CurrentHeight = item.CurrentHeight + (targetHeight - item.CurrentHeight) * 0.3
+                
+                -- Cập nhật kích thước thanh (độ rộng tự động giãn đều theo scale khối chính)
+                item.Part.Size = Vector3.new(barWidth * scaleFactor, item.CurrentHeight, item.Part.Size.Z)
+                
+                -- Định vị lại chân thanh luôn bám sát mặt trên khi khối hộp đập to nhỏ
+                local currentTop = (baseSize.Y * scaleFactor) / 2
+                local currentXOffset = (-(baseSize.X / 2) + (item.Index - 0.5) * barWidth) * scaleFactor
+                item.Weld.C0 = CFrame.new(currentXOffset, currentTop + (item.CurrentHeight / 2), 0)
+                
+                -- Đổi màu dải cầu vồng lệch nhịp nối tiếp nhau kèm hiệu ứng chớp theo bass
+                local barHue = (hue + (item.Index * 20)) % 360
+                -- Khi bass đập mạnh, màu sắc thanh nhịp sẽ sáng rực lên (Chớp theo nhạc)
+                local brightness = math.clamp(0.7 + (normLoudness * 0.3), 0.7, 1)
+                item.Part.Color = Color3.fromHSV(barHue / 360, 1, brightness)
+            end
+        end
+    end)
 end
 
--- TỰ ĐỘNG ĐEO LẠI LOA NGAY KHI VỪA HỒI SINH (BẤT TỬ LOA)
+-- TỰ ĐỘNG ĐEO LẠI KHI DIE
 LocalPlayer.CharacterAdded:Connect(function(char)
-    char:WaitForChild("HumanoidRootPart", 5)
-    if LocalSound.IsPlaying then
-        CreateFakeBoombox()
-    end
+    char:WaitForChild("Humanoid")
+    task.wait(0.5) -- Chờ nhân vật tải xong hoàn toàn
+    CreateFakeBoombox() -- Tự động tạo lại loa dính sau lưng mãi mãi
 end)
 
--- GIAO DIỆN GUI NGUYÊN BẢN
+-- GIAO DIỆN GUI (Giữ nguyên toàn bộ cấu trúc cũ)
 local ScreenGui = Instance.new("ScreenGui", PlayerGui)
 ScreenGui.ResetOnSpawn = false
 
@@ -85,7 +163,6 @@ MainFrame.Position = UDim2.new(0.5, -125, 0.4, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 MainFrame.Draggable = true
 MainFrame.Active = true
-MainFrame.Visible = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 -- Nút ẨN MENU
@@ -100,14 +177,14 @@ HideBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false 
 end)
 
--- NÚT MỞ MENU (DRAGGABLE)
+-- Nút MỞ MENU
 local OpenBtn = Instance.new("TextButton", ScreenGui)
 OpenBtn.Size = UDim2.new(0, 50, 0, 50)
 OpenBtn.Position = UDim2.new(0, 10, 0.5, 0)
 OpenBtn.Text = "TP 🎵"
 OpenBtn.TextColor3 = Color3.new(1, 1, 1)
 OpenBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-OpenBtn.Draggable = true 
+OpenBtn.Draggable = true
 OpenBtn.Active = true
 Instance.new("UICorner", OpenBtn)
 OpenBtn.MouseButton1Click:Connect(function()
@@ -118,7 +195,7 @@ end)
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(0.8, 0, 0, 30)
 Title.Position = UDim2.new(0.05, 0, 0.05, 0)
-Title.Text = "🎵 THANH PHÚC MUSIC"
+Title.Text = "🎵 THANH PHÚC MUSIC (MI 10S)"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.BackgroundTransparency = 1
 Title.TextXAlignment = Enum.TextXAlignment.Left
@@ -136,20 +213,21 @@ Instance.new("UICorner", InputBox)
 local PlayBtn = Instance.new("TextButton", MainFrame)
 PlayBtn.Size = UDim2.new(0.9, 0, 0, 40)
 PlayBtn.Position = UDim2.new(0.05, 0, 0.55, 0)
-PlayBtn.Text = "PHÁT NHẠC"
+PlayBtn.Text = "PHÁT NHẠC BASS"
 PlayBtn.TextColor3 = Color3.new(1, 1, 1)
 PlayBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
 Instance.new("UICorner", PlayBtn)
 
--- Kích hoạt phát nhạc và gọi Thùng Loa xuất hiện ngay lập tức
+-- Kích hoạt phát nhạc và gọi Loa Đeo Chéo xuất hiện
 PlayBtn.MouseButton1Click:Connect(function()
     local cleanID = InputBox.Text:match("%d+")
     if cleanID then
         LocalSound.SoundId = "rbxassetid://" .. cleanID
         LocalSound:Play()
         
+        -- Thực hiện tạo mới / cập nhật lại loa ngay lập tức
         CreateFakeBoombox()
-        print("Thanh Phuc Music: Đã hiện thùng loa chữ nhật chuẩn 100% sau lưng!")
+        print("Thanh Phuc đã kích hoạt Loa Kép Mi 10S Super Bass thành công!")
     else
         InputBox.Text = ""
         InputBox.PlaceholderText = "ID không hợp lệ!"
